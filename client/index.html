@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>KSP Crime Intelligence Assistant</title>
+<style>
+  body { font-family: Arial, sans-serif; background: #0d1117; color: #e6edf3; margin: 0; }
+  header { background: #000; padding: 16px 24px; border-bottom: 3px solid #1f6feb; }
+  header h1 { margin: 0; font-size: 20px; }
+  header p { margin: 4px 0 0; font-size: 13px; color: #8b949e; }
+  #chat { max-width: 700px; margin: 20px auto; padding: 0 16px; }
+  .msg { padding: 10px 14px; border-radius: 10px; margin: 8px 0; max-width: 80%; line-height: 1.4; }
+  .user { background: #1f6feb; margin-left: auto; text-align: right; }
+  .bot { background: #21262d; margin-right: auto; }
+  .blocked { background: #4a1f1f; border: 1px solid #f85149; }
+  #inputRow { max-width: 700px; margin: 0 auto 20px; padding: 0 16px; display: flex; gap: 8px; }
+  #question { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #30363d; background: #161b22; color: #e6edf3; }
+  button { padding: 10px 16px; border-radius: 8px; border: none; background: #1f6feb; color: white; cursor: pointer; }
+  button:disabled { opacity: 0.5; }
+  #printBtn { background: #30363d; }
+  @media print { #inputRow, button, header p { display: none; } }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🛡️ KSP Crime Intelligence Assistant (Prototype)</h1>
+  <p>Demo data only — synthetic FIR records, not real crime data. Ask in English or Kannada.</p>
+</header>
+
+<div id="chat"></div>
+
+<div id="inputRow">
+  <input id="question" type="text" placeholder="e.g. Show me open theft cases in Bengaluru Urban" />
+  <button id="sendBtn" onclick="sendMessage()">Send</button>
+  <button id="printBtn" onclick="window.print()">Save as PDF</button>
+</div>
+
+<script>
+  // ⚠️ IMPORTANT: after you deploy your Catalyst Function, paste its URL here.
+  const FUNCTION_URL = "PASTE_YOUR_CATALYST_FUNCTION_URL_HERE";
+
+  let history = []; // keeps the conversation so follow-up questions work
+
+  function addMessage(text, sender) {
+    const chat = document.getElementById("chat");
+    const div = document.createElement("div");
+    div.className = "msg " + sender;
+    div.innerText = text;
+    chat.appendChild(div);
+    window.scrollTo(0, document.body.scrollHeight);
+  }
+
+  async function sendMessage() {
+    const input = document.getElementById("question");
+    const question = input.value.trim();
+    if (!question) return;
+
+    addMessage(question, "user");
+    input.value = "";
+    document.getElementById("sendBtn").disabled = true;
+
+    try {
+      const res = await fetch(FUNCTION_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question, history })
+      });
+      const data = await res.json();
+
+      addMessage(data.answer, data.blocked ? "blocked" : "bot");
+
+      // remember this turn for follow-up questions
+      history.push({ role: "user", content: question });
+      history.push({ role: "assistant", content: data.answer });
+
+    } catch (err) {
+      addMessage("Error reaching the assistant. Check the FUNCTION_URL is set correctly.", "blocked");
+      console.error(err);
+    }
+
+    document.getElementById("sendBtn").disabled = false;
+  }
+
+  document.getElementById("question").addEventListener("keypress", function(e) {
+    if (e.key === "Enter") sendMessage();
+  });
+</script>
+
+</body>
+</html>
